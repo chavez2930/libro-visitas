@@ -16,7 +16,7 @@ DB_PASS="$(openssl rand -hex 16)"  # contraseña aleatoria, solo vive en config.
 
 echo "==> Instalando paquetes..."
 apt-get update
-apt-get install -y apache2 php libapache2-mod-php php-mysql mariadb-server openssl curl
+apt-get install -y apache2 php libapache2-mod-php php-mysql php-mbstring mariadb-server openssl curl
 systemctl enable --now apache2 mariadb
 
 echo "==> Creando base de datos..."
@@ -27,15 +27,15 @@ ALTER USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
 GRANT SELECT, INSERT ON $DB_NAME.* TO '$DB_USER'@'localhost';
 CREATE TABLE IF NOT EXISTS $DB_NAME.mensajes (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  nombre VARCHAR(50) NOT NULL,
-  texto VARCHAR(300) NOT NULL,
+  nombre VARCHAR(50) NOT NULL CHECK (CHAR_LENGTH(nombre) >= 2),
+  texto VARCHAR(300) NOT NULL CHECK (CHAR_LENGTH(texto) >= 3),
   fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 SQL
 
 echo "==> Copiando la página..."
 rm -f "$WEB/index.html"
-install -m 644 "$DIR/index.php" "$WEB/index.php"
+install -m 644 "$DIR/index.php" "$DIR/validar.php" "$WEB/"
 cat > "$WEB/config.php" <<PHP
 <?php
 \$DB_NAME = '$DB_NAME';

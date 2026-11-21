@@ -27,6 +27,16 @@ cloudflared tunnel --url http://localhost:80
 Copia el enlace `https://....trycloudflare.com` que aparece: ese es el público.
 Funciona mientras esa terminal esté abierta y cambia cada vez que lo vuelves a abrir.
 
+## Validaciones
+
+- Nombre: 2–50 caracteres; solo letras, números, espacios, `.`, `-` y `'`.
+- Mensaje: 3–300 caracteres, sin enlaces.
+- Se quitan caracteres de control y se rechaza texto con codificación inválida.
+- Token CSRF, campo trampa contra bots y espera de 15 s entre mensajes.
+- Los errores se muestran en la página y no se pierde lo que escribiste.
+- La base de datos también exige las longitudes mínimas (`CHECK`).
+- Prueba de las validaciones: `php test_validar.php`
+
 ## Seguridad
 
 - La contraseña de la base de datos se genera al instalar y solo se guarda en `/var/www/html/config.php` (no está en este repo).
