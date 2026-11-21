@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instala el libro de visitas en Kali: Apache + PHP + MariaDB.
+# Instala el libro de visitas en Kali: Apache + PHP + MariaDB (usa los que Kali ya trae).
 # Uso: sudo ./install.sh
 set -euo pipefail
 
@@ -14,9 +14,18 @@ DB_NAME=visitas
 DB_USER=web
 DB_PASS="$(openssl rand -hex 16)"  # contraseña aleatoria, solo vive en config.php
 
-echo "==> Instalando paquetes..."
-apt-get update
-apt-get install -y apache2 php libapache2-mod-php php-mysql php-mbstring mariadb-server openssl curl
+echo "==> Revisando paquetes..."
+FALTAN=""
+for p in apache2 php libapache2-mod-php php-mysql mariadb-server openssl curl; do
+  dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q 'install ok installed' || FALTAN="$FALTAN $p"
+done
+if [ -n "$FALTAN" ]; then
+  echo "    Instalando:$FALTAN"
+  apt-get update
+  apt-get install -y $FALTAN
+else
+  echo "    Ya están todos instalados (Kali los trae por defecto)."
+fi
 systemctl enable --now apache2 mariadb
 
 echo "==> Creando base de datos..."

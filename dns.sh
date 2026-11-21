@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Servidor DNS (BIND9) para el dominio local visitas.test -> IP de esta Kali,
+# Servidor DNS (dnsmasq) para el dominio local visitas.test -> IP de esta Kali,
 # más un VirtualHost de Apache con ese nombre.
 # Uso: sudo ./dns.sh
 set -euo pipefail
@@ -12,45 +12,43 @@ fi
 DOMINIO=visitas.test
 IP="$(ip -4 route get 1.1.1.1 | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}')"
 [ -n "$IP" ] || { echo "No pude detectar la IP de la red" >&2; exit 1; }
-SERIAL="$(date +%Y%m%d%H)"
 
-echo "==> Instalando BIND9..."
-apt-get install -y bind9 bind9-dnsutils
+if ! command -v dnsmasq >/dev/null; then
+  echo "==> Instalando dnsmasq..."
+  apt-get update && apt-get install -y dnsmasq-base
+fi
 
-echo "==> Configurando zona $DOMINIO -> $IP"
-cat > /etc/bind/named.conf.options <<EOF
-options {
-  directory "/var/cache/bind";
-  listen-on { any; };
-  listen-on-v6 { none; };
-  allow-query { localhost; localnets; };      // solo tu red local
-  recursion yes;
-  allow-recursion { localhost; localnets; };  // no ser resolvedor abierto
-  forwarders { 8.8.8.8; 1.1.1.1; };           // el resto de dominios
-  dnssec-validation auto;
-};
+echo "==> Configurando DNS: $DOMINIO -> $IP"
+cat > /etc/visitas-dns.conf <<EOF
+# Responde visitas.test (y www., ns., etc.) con la IP de esta Kali
+address=/$DOMINIO/$IP
+listen-address=127.0.0.1,$IP
+bind-interfaces
+local-service          # solo contesta a equipos de tu red local
+no-resolv
+server=8.8.8.8         # el resto de dominios se reenvía
+server=1.1.1.1
+domain-needed
+bogus-priv
 EOF
+dnsmasq --test -C /etc/visitas-dns.conf
 
-cat > /etc/bind/named.conf.local <<EOF
-zone "$DOMINIO" {
-  type master;
-  file "/etc/bind/db.$DOMINIO";
-};
+cat > /etc/systemd/system/visitas-dns.service <<EOF
+[Unit]
+Description=DNS local para $DOMINIO (dnsmasq)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=$(command -v dnsmasq) -k -C /etc/visitas-dns.conf
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
 EOF
-
-cat > "/etc/bind/db.$DOMINIO" <<EOF
-\$TTL 300
-@   IN SOA ns.$DOMINIO. admin.$DOMINIO. ( $SERIAL 3600 600 86400 300 )
-@   IN NS  ns.$DOMINIO.
-@   IN A   $IP
-ns  IN A   $IP
-www IN A   $IP
-EOF
-
-named-checkconf
-named-checkzone "$DOMINIO" "/etc/bind/db.$DOMINIO"
-systemctl enable named >/dev/null 2>&1 || true
-systemctl restart named
+systemctl daemon-reload
+systemctl enable --now visitas-dns
+systemctl restart visitas-dns
 
 echo "==> Configurando Apache para $DOMINIO"
 cat > /etc/apache2/sites-available/visitas.conf <<EOF
@@ -67,10 +65,11 @@ apache2ctl configtest
 systemctl reload apache2
 
 echo "==> Comprobando..."
-R="$(dig @127.0.0.1 "www.$DOMINIO" +short)"
+sleep 1
+R="$(dig @127.0.0.1 "www.$DOMINIO" +short 2>/dev/null || nslookup "www.$DOMINIO" 127.0.0.1 | awk '/^Address: /{print $2}' | tail -1)"
 if [ "$R" = "$IP" ] && curl -fsS --resolve "www.$DOMINIO:80:127.0.0.1" "http://www.$DOMINIO/" | grep -q "Libro de visitas"; then
-  echo "==> Listo: http://www.$DOMINIO -> $IP (DNS en $IP)"
+  echo "==> Listo: http://www.$DOMINIO -> $IP (servidor DNS en $IP)"
 else
-  echo "==> Algo falló (dig devolvió: '$R')" >&2
+  echo "==> Algo falló (el DNS devolvió: '$R')" >&2
   exit 1
 fi

@@ -35,6 +35,7 @@ Funciona mientras esa terminal esté abierta y cambia cada vez que lo vuelves a 
 - Token CSRF, campo trampa contra bots y espera de 15 s entre mensajes.
 - Los errores se muestran en la página y no se pierde lo que escribiste.
 - La base de datos también exige las longitudes mínimas (`CHECK`).
+- Funciona sin la extensión mbstring (no hace falta descargar nada).
 - Prueba de las validaciones: `php test_validar.php`
 
 ## Seguridad
@@ -43,3 +44,12 @@ Funciona mientras esa terminal esté abierta y cambia cada vez que lo vuelves a 
 - El usuario `web` solo puede leer y agregar mensajes.
 - Consultas preparadas (sin inyección SQL) y texto escapado (sin XSS).
 - La base de datos no se expone a internet; el túnel solo publica la página.
+
+## DNS local (visitas.test)
+
+```bash
+sudo ./dns.sh
+```
+
+Levanta un servidor DNS (dnsmasq) en la Kali que responde `visitas.test` y `www.visitas.test` con la IP de la Kali, y un VirtualHost de Apache con ese nombre.
+Para abrirlo desde otra PC de la red, pon la IP de la Kali como DNS de esa PC y entra a http://www.visitas.test

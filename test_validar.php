@@ -20,5 +20,7 @@ mal('Ana', 'visita https://spam.com');
 mal('Ana', 'entra a www.spam.com');
 mal("Ana\xff", 'Hola mundo');
 mal('Ana', "   \x00\x01  ");
+ok('Ñu', str_repeat('é', 300));   // 300 letras con acento = 300, no 600 bytes
+mal('Ñu', str_repeat('é', 301));
 
 echo "Todas las pruebas pasaron\n";
